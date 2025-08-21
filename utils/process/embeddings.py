@@ -19,26 +19,24 @@ class NodesEmbedding:
 
         assert self.nodes_dim >= 0
 
-    def __call__(self, nodes):
+    def __call__(self, nodes):    
         embedded_nodes = self.embed_nodes(nodes)
-        return torch.from_numpy(embedded_nodes).float()
+        nodes_tensor = torch.from_numpy(embedded_nodes).float()
 
+        # Buffer node 
+        self.target = torch.zeros(self.nodes_dim, self.bert_hidden_size + 1).float()
+        self.target[:nodes_tensor.size(0), :] = nodes_tensor
+        return self.target
+    
     def embed_nodes(self, nodes):
         embeddings = []
-        
-        valid_nodes_data = []
-        
-        for n_id, node in nodes.items():
-            node_code = node.get_code()
-            tokenized_code = tokenizer(node_code, True)
-            valid_nodes_data.append((n_id, node, tokenized_code))
         
         all_input_ids = []
         all_attention_masks = []
         node_types = []
-        for n_id, node, tokenized_code in valid_nodes_data:
-            str_tokens = ' '.join(tokenized_code)
-            input_ids, attention_mask = encode_input(str_tokens, self.tokenizer_bert)
+        for n_id, node in nodes.items():
+            node_code = node.get_code()
+            input_ids, attention_mask = encode_input(node_code, self.tokenizer_bert)
             
             all_input_ids.append(input_ids)
             all_attention_masks.append(attention_mask)  
@@ -57,7 +55,7 @@ class NodesEmbedding:
             
             source_embeddings = cls_feats.cpu().numpy()
         
-        # Combine với node types (thứ tự đúng vì cùng iterate qua valid_nodes_data)
+        # Combine với node types
         for i, node_type in enumerate(node_types):
             embedding = np.concatenate((np.array([node_type]), source_embeddings[i]), axis=0)
             embeddings.append(embedding)
